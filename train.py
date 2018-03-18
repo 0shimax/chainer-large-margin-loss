@@ -6,8 +6,7 @@ import chainer.links as L
 from chainer import training
 from chainer.training import extensions
 
-from updater import StandardUpdater
-from adam import Adam
+from large_margin_loss import large_margin_loss
 
 
 # Network definition
@@ -27,6 +26,10 @@ class MLP(chainer.Chain):
         out = self.l3(h2)
         self.outputs = [h1, h2, out]
 
+        # if chainer.config.train:
+        #     self.loss = large_margin_loss(out, t)
+        # else:
+        #     self.loss = F.softmax_cross_entropy(out, t)
         self.loss = F.softmax_cross_entropy(out, t)
         self.accuracy = F.accuracy(out, t)
         chainer.report(
@@ -70,8 +73,7 @@ def main():
         model.to_gpu()  # Copy the model to the GPU
 
     # Setup an optimizer
-    # optimizer = chainer.optimizers.Adam()
-    optimizer = Adam()
+    optimizer = chainer.optimizers.Adam()
     optimizer.setup(model)
 
     # Load the MNIST dataset
@@ -82,8 +84,7 @@ def main():
                                                  repeat=False, shuffle=False)
 
     # Set up a trainer
-    # updater = training.StandardUpdater(
-    updater = StandardUpdater(
+    updater = training.StandardUpdater(
         train_iter, optimizer, device=args.gpu)
     trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
 

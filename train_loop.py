@@ -12,6 +12,7 @@ import chainer
 from chainer.dataset import convert
 import chainer.links as L
 from chainer import serializers
+from chainer.functions.activation import log_softmax
 
 from train import MLP
 
@@ -20,8 +21,7 @@ n_class = 10
 
 
 def softmax(x):
-    e_x = np.exp(x - np.max(x))
-    return e_x / e_x.sum(axis=1).reshape(-1, 1)
+    return log_softmax._log_softmax(x)
 
 
 def compute_large_margin_loss(model, t, n_class, gamma=1, eps=1e-6):
@@ -32,7 +32,7 @@ def compute_large_margin_loss(model, t, n_class, gamma=1, eps=1e-6):
     diff_out = out - t_one_hot
     loss = None
     for h in model.outputs:
-        res = gamma+diff_out/(np.linalg.norm(eps+h.grad, axis=1)).reshape(-1, 1)
+        res = gamma+diff_out/(np.linalg.norm(eps+h.grad, ord=2, axis=1)).reshape(-1, 1)
         res = np.where(res < 0, 0., res).astype(np.float32)
         res = res.sum(axis=1)
         if loss is None:
@@ -75,7 +75,7 @@ def main():
     # Setup an optimizer
     optimizer = chainer.optimizers.Adam()
     optimizer.setup(model)
-    optimizer.add_hook(chainer.optimizer.GradientClipping(10.0))
+    optimizer.add_hook(chainer.optimizer.GradientClipping(5.0))
 
     if args.resume:
         # Resume from a snapshot
@@ -107,7 +107,7 @@ def main():
         model.loss.data = \
             compute_large_margin_loss(model, t_array, n_class, gamma=1, eps=1e-6)
         model.cleargrads()
-        loss.backward()
+        model.loss.backward()
         optimizer.update()
 
         sum_loss += float(model.loss.data) * len(t.data)
